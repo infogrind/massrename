@@ -12,6 +12,13 @@ import argparse
 
 def main():
     """Parses command-line arguments and initiates the renaming process."""
+    parser = create_parser()
+    args = parser.parse_args()
+    run(args)
+
+
+def create_parser():
+    """Creates and configures the argument parser."""
     parser = argparse.ArgumentParser(
         description="""
         Massrename renames all files in <directory> that match the regular expression
@@ -40,8 +47,11 @@ def main():
     parser.add_argument("directory", help="The directory containing files to rename.")
     parser.add_argument("pattern", help="The regular expression to match.")
     parser.add_argument("replacement", help="The replacement string.")
-    args = parser.parse_args()
+    return parser
 
+
+def run(args):
+    """The main logic of the script."""
     # The base directory.
     base_dir = args.directory
     if not os.path.exists(base_dir):
