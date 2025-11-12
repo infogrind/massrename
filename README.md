@@ -16,4 +16,3 @@ can contain `\1`, `\2`, … if there are corresponding groups in the pattern.
     -i  Ignore case in regular expression.
     -r  Recursive mode.
     -f  Force mode: does not ask for confirmation before renaming.
-    -r  Recursive mode
