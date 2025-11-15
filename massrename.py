@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+
+"""
+Massrename renames all files in a directory that match a regular expression.
+"""
+
+import sys
+import os
+import re
+import argparse
+
+
+def main():
+    """Parses command-line arguments and initiates the renaming process."""
+    parser = create_parser()
+    args = parser.parse_args()
+    run(args)
+
+
+def create_parser():
+    """Creates and configures the argument parser."""
+    parser = argparse.ArgumentParser(
+        description="""
+        Massrename renames all files in <directory> that match the regular expression
+  <pattern> using the substitution string <replacement>. The substitution string
+  can contain \\1, \\2, ... if there are corresponding groups in the pattern.
+        """
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Display verbose output."
+    )
+    parser.add_argument(
+        "-i",
+        "--ignorecase",
+        action="store_true",
+        help="Ignore case in regular expression.",
+    )
+    parser.add_argument(
+        "-r", "--recursive", action="store_true", help="Recursive mode."
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Force mode: does not ask for confirmation before renaming.",
+    )
+    parser.add_argument("directory", help="The directory containing files to rename.")
+    parser.add_argument("pattern", help="The regular expression to match.")
+    parser.add_argument("replacement", help="The replacement string.")
+    return parser
+
+
+def run(args):
+    """The main logic of the script."""
+    # The base directory.
+    base_dir = args.directory
+    if not os.path.exists(base_dir):
+        sys.stderr.write("Directory " + base_dir + " does not exist.\n")
+        sys.exit(1)
+
+    # The episode pattern and the replacement test
+    if args.ignorecase:
+        pattern = re.compile(args.pattern, re.I)
+    else:
+        pattern = re.compile(args.pattern)
+    replacement = args.replacement
+
+    # The actual stuff!
+    mass_rename(base_dir, pattern, replacement, args)
+
+
+def mass_rename(base_dir, pattern, replacement, args):
+    """
+    Renames files in a directory based on a regular expression.
+
+    Args:
+        base_dir: The directory to process.
+        pattern: The compiled regular expression to match.
+        replacement: The replacement string.
+        args: The command-line arguments.
+    """
+    debug("Getting contents of directory " + base_dir, args)
+    try:
+        files = os.listdir(base_dir)
+        files.sort()
+    except OSError as e:
+        sys.stderr.write(f"Error reading directory {base_dir}: {e}\n")
+        return
+
+    renames = {}
+    directory_contents = set(files)
+    for filename in files:
+        if args.recursive and os.path.isdir(os.path.join(base_dir, filename)):
+            subdir = os.path.join(base_dir, filename)
+            debug("Entering directory " + subdir, args)
+            mass_rename(subdir, pattern, replacement, args)
+
+        if pattern.match(filename):
+            debug("Match found: " + filename, args)
+            new_name = pattern.sub(replacement, filename)
+
+            if new_name in directory_contents:
+                debug(
+                    f"Sorry, file with name {new_name} already exists. Will not rename.",
+                    args,
+                )
+            else:
+                renames[filename] = new_name
+                directory_contents.remove(filename)
+                directory_contents.add(new_name)
+        else:
+            debug("No match: " + filename, args)
+
+    for old_name, new_name in sorted(renames.items()):
+        print(f"{old_name}\n  -> {new_name}")
+
+    if not renames:
+        print("No match found in directory ", base_dir)
+        return
+
+    if not args.force and not confirm(prompt="Go ahead?", resp=False):
+        print("Aborted.")
+        return
+
+    for old_name, new_name in sorted(renames.items()):
+        old_path = os.path.join(base_dir, old_name)
+        new_path = os.path.join(base_dir, new_name)
+        debug(f"Renaming {old_path} -> {new_path}", args)
+
+        if old_path == new_path:
+            debug(f"{old_path} already has the correct name.", args)
+            continue
+
+        if os.path.exists(new_path):
+            print(
+                f"BAD BAD BAD! I almost tried to erase the existing file {new_path}."
+            )
+            sys.exit(1)
+
+        try:
+            os.rename(old_path, new_path)
+        except OSError as e:
+            sys.stderr.write(f"Error renaming {old_path}: {e}\n")
+
+
+def confirm(prompt=None, resp=False):
+    """
+    Prompts for a yes or no response from the user. Returns True for yes and
+    False for no.
+
+    'resp' should be set to the default value assumed by the caller when the
+    user simply types ENTER.
+    """
+    if prompt is None:
+        prompt = "Confirm"
+
+    if resp:
+        prompt = f"{prompt} [Y/n]: "
+    else:
+        prompt = f"{prompt} [y/N]: "
+
+    while True:
+        ans = input(prompt).lower()
+        if not ans:
+            return resp
+        if ans in ["y", "yes"]:
+            return True
+        if ans in ["n", "no"]:
+            return False
+        print("Please enter y or n.")
+
+
+def debug(message, args):
+    """Prints a debug message if verbose mode is enabled."""
+    if args.verbose:
+        sys.stderr.write(message + "\n")
+
+
+if __name__ == "__main__":
+    main()
