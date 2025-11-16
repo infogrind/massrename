@@ -10,4 +10,4 @@ dependencies = []
 dev = ["pytest>=9.0.1"]
 
 [project.scripts]
-gpt-epub-rename = "massrename:main"
+massrename = "massrename:main"
